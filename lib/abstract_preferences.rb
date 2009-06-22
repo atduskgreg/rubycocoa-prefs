@@ -1,5 +1,15 @@
 require 'singleton'
 
+class NSUserDefaults
+  def [](str)
+    self.objectForKey(str)
+  end
+  
+  def []=(str, obj)
+    self.setObject(obj, forKey:str)
+  end
+end
+
 class Preferences
   include Singleton
   
@@ -9,9 +19,9 @@ class Preferences
   end
   
   class << self
-    # A shortcut method for access to <tt>OSX::NSUserDefaults.standardUserDefaults</tt>.
+    # A shortcut method for access to <tt>NSUserDefaults.standardUserDefaults</tt>.
     def user_defaults
-      OSX::NSUserDefaults.standardUserDefaults
+      NSUserDefaults.standardUserDefaults
     end
     
     # A hash of all default values for the user defaults
@@ -66,7 +76,7 @@ class Preferences
         
         class_eval do
           define_method(name) do
-            Preferences.user_defaults[key_path].to_ruby
+            Preferences.user_defaults[key_path]
           end
           
           define_method("#{name}=") do |value|
@@ -127,17 +137,18 @@ class Preferences
     #   end
     def observe(name, observer)
       key_path = "values.#{self.class.section_defaults_key}.#{name}"
-      OSX::NSUserDefaultsController.sharedUserDefaultsController.
-        addObserver_forKeyPath_options_context(observer, key_path, OSX::NSKeyValueObservingOptionNew, nil)
+      NSUserDefaultsController.sharedUserDefaultsController.addObserver(observer,
+        forKeyPath:key_path, options:NSKeyValueObservingOptionNew, context:nil
+      )
     end
   end
   
-  class StringArrayWrapper < OSX::NSObject
+  class StringArrayWrapper < NSObject
     class << self
       attr_accessor :key_path
       
       def array
-        Preferences.user_defaults[key_path].to_ruby
+        Preferences.user_defaults[key_path]
       end
       
       def array=(array)
@@ -155,10 +166,10 @@ class Preferences
       end
     end
     
-    kvc_accessor :string
+    attr_accessor :string
     attr_accessor :index
     
-    def initWithString_index(string, index)
+    def initWithString(string, index:index)
       if init
         @string, @index = string, index
         self
@@ -195,7 +206,7 @@ class Preferences
       "#<#{self.class.name}:#{object_id} string=\"#{@string}\" key_path=\"#{self.class.key_path}\" index=\"#{@index}\">"
     end
   end
-  
+
   # Extend your class with this module to get access to a few KVC accessor helper methods.
   module AccessorHelpers
     # Defines a kvc_accessor which reads and writes
@@ -250,19 +261,19 @@ class Preferences
     end
   end
   
-  module KVOCallbackHelper
-    # We need to actually define the method on the class because otherwise the method is not
-    # resolved at runtime, probably a bug in RubyCocoa.
-    def self.included(klass)
-      klass.class_eval do
-        def observeValueForKeyPath_ofObject_change_context(key_path, observed, change, context)
-          value_key_path = key_path.sub(/^values\./, '')
-          callback_method = "#{key_path.split('.').last}_changed"
-          send(callback_method, Preferences.user_defaults[value_key_path].to_ruby)
-        end
-      end
-    end
-  end
+  # module KVOCallbackHelper
+  #     # We need to actually define the method on the class because otherwise the method is not
+  #     # resolved at runtime, probably a bug in RubyCocoa.
+  #     def self.included(klass)
+  #       klass.class_eval do
+  #         def observeValueForKeyPath_ofObject_change_context(key_path, observed, change, context)
+  #           value_key_path = key_path.sub(/^values\./, '')
+  #           callback_method = "#{key_path.split('.').last}_changed"
+  #           send(callback_method, Preferences.user_defaults[value_key_path].to_ruby)
+  #         end
+  #       end
+  #     end
+  #   end
 end
 
 module Kernel
